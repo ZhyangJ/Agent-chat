@@ -23,9 +23,10 @@
 ## 项目架构
 
 ```
-├── backend/          # 后端服务
+├── backend/         # 后端服务
 │   ├── index.js     # 主服务器文件
 │   ├── package.json # 后端依赖
+│   ├── tools.js     # Agent工具库
 │   └── .env         # 环境变量配置
 ├── src/             # 前端代码
 │   ├── views/       # 页面组件
