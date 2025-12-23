@@ -298,7 +298,7 @@ async function handleAgentRequest(messages, res) {
   let iteration = 0;
   let lastUserMessageIndex = messages.filter(m => m.role === 'user').length - 1; // 记录最后一条用户消息的索引
 
-  // 方案 A：在对话最前面添加系统指令，约束模型回答风格，避免重复讲解和输出 HTML 源码
+  // 在对话最前面添加系统指令，约束模型回答风格，避免重复讲解和输出 HTML 源码
   const hasSystemMessage = conversationMessages.some(m => m.role === 'system');
   if (!hasSystemMessage) {
     conversationMessages.unshift({

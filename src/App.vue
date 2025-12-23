@@ -1,9 +1,6 @@
 <script setup>
-// 导入Element Plus图标
+// 导入Element Plus图标（仅保留 AI 对话相关）
 import { 
-  HomeFilled, 
-  List, 
-  Document, 
   Setting,
   ChatRound
 } from '@element-plus/icons-vue'
@@ -17,7 +14,7 @@ import {
       <el-aside width="200px" style="background-color: #001529;">
         <!-- 系统标题 -->
         <div class="logo-container">
-          <h1 class="logo-text">Todo 系统</h1>
+          <h1 class="logo-text">AI 对话系统</h1>
         </div>
         
         <!-- 使用Element Plus的Menu组件实现导航菜单 -->
@@ -30,27 +27,6 @@ import {
           router
         >
           <el-menu-item index="/">
-            <template #title>
-              <el-icon><HomeFilled /></el-icon>
-              <span>首页</span>
-            </template>
-          </el-menu-item>
-          
-          <el-menu-item index="/todo">
-            <template #title>
-              <el-icon><List /></el-icon>
-              <span>待办列表</span>
-            </template>
-          </el-menu-item>
-          
-          <el-menu-item index="/about">
-            <template #title>
-              <el-icon><Document /></el-icon>
-              <span>关于系统</span>
-            </template>
-          </el-menu-item>
-          
-          <el-menu-item index="/ai">
             <template #title>
               <el-icon><ChatRound /></el-icon>
               <span>AI对话</span>

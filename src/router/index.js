@@ -1,31 +1,13 @@
 // 导入路由模块
 import { createRouter, createWebHistory } from 'vue-router'
 
-// 导入视图组件
-import HomeView from '../views/HomeView.vue'
-import TodoView from '../views/TodoView.vue'
-import AboutView from '../views/AboutView.vue'
+// 导入视图组件（只保留 AI 对话）
 import AIVIew from '../views/AIVIew.vue'
 
 // 定义路由配置
 const routes = [
   {
     path: '/',
-    name: 'home',
-    component: HomeView
-  },
-  {
-    path: '/todo',
-    name: 'todo',
-    component: TodoView
-  },
-  {
-    path: '/about',
-    name: 'about',
-    component: AboutView
-  },
-  {
-    path: '/ai',
     name: 'ai',
     component: AIVIew
   }

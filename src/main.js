@@ -5,9 +5,6 @@ import App from './App.vue'
 // 【新增：导入路由配置】
 import router from './router'
 
-// 【新增：导入Pinia状态管理】
-import { createPinia } from 'pinia'
-
 // 【新增：导入Element Plus组件库】
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
@@ -17,9 +14,6 @@ const app = createApp(App)
 
 // 【新增：使用路由】
 app.use(router)
-
-// 【新增：使用Pinia状态管理】
-app.use(createPinia())
 
 // 【新增：使用Element Plus组件库】
 app.use(ElementPlus)
