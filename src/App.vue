@@ -14,7 +14,7 @@ import {
       <el-aside width="200px" style="background-color: #001529;">
         <!-- 系统标题 -->
         <div class="logo-container">
-          <h1 class="logo-text">AI 对话系统</h1>
+          <h1 class="logo-text">历史对话</h1>
         </div>
         
         <!-- 使用Element Plus的Menu组件实现导航菜单 -->
@@ -43,26 +43,11 @@ import {
           <div style="flex: 1;"></div>
           
           <!-- 标题居中 -->
-          <h2>小圆前端练习</h2>
+          <h2>AI Agent</h2>
           
           <!-- 右侧占位元素 -->
           <div style="flex: 1;"></div>
           
-          <!-- 恢复系统设置下拉菜单 -->
-          <div class="user-info">
-            <el-dropdown>
-              <span class="el-dropdown-link">
-                <el-icon class="el-icon--right"><Setting /></el-icon>
-                系统设置
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item>个人中心</el-dropdown-item>
-                  <el-dropdown-item>退出登录</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
         </el-header>
         
         <!-- 路由视图区域 -->
