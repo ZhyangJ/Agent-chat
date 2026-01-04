@@ -36,10 +36,88 @@ function buildContentFromToolResults(toolResults) {
 
     case 'searchWeb':
       if (parsed && Array.isArray(parsed.results)) {
-        const top = parsed.results.slice(0, 3).join('\n');
-        return `根据搜索「${parsed.query}」得到 ${parsed.count} 条结果，前几条如下：\n${top}`;
+        console.log(`📊 搜索结果详情: count=${parsed.count}, results.length=${parsed.results.length}`);
+        
+        // 智能选择显示数量
+        const MAX_DISPLAY = 10; // 最多显示10条
+        const MIN_DISPLAY = 5;  // 最少显示5条
+        
+        let displayCount = Math.min(parsed.count, MAX_DISPLAY);
+        if (parsed.count > MAX_DISPLAY) {
+          // 如果结果很多，确保显示足够的信息
+          displayCount = Math.max(MIN_DISPLAY, Math.min(MAX_DISPLAY, parsed.count / 2));
+        }
+        
+        // 选择要显示的结果（避免全是链接）
+        const displayedResults = [];
+        let nonLinkCount = 0;
+        
+        for (const result of parsed.results) {
+          if (displayedResults.length >= displayCount) break;
+          
+          // 优先显示非链接内容
+          if (!result.includes('http://') && !result.includes('https://') && 
+              !result.includes('完整内容') && !result.includes('移动端')) {
+            displayedResults.push(result);
+            nonLinkCount++;
+          } else if (nonLinkCount >= 3) {
+            // 至少显示了3条非链接内容后，才添加链接
+            displayedResults.push(result);
+          }
+        }
+        
+        // 确保至少显示了一些内容
+        if (displayedResults.length === 0 && parsed.results.length > 0) {
+          displayedResults.push(...parsed.results.slice(0, Math.min(5, parsed.results.length)));
+        }
+        
+        // 构建响应
+        let response = `🔍 ${parsed.query}的搜索结果（共 ${parsed.count} 条）\n\n`;
+        
+        displayedResults.forEach((result, index) => {
+          // 美化格式
+          let formattedResult = result;
+          
+          // 移除多余的标记
+          if (formattedResult.startsWith('📖')) {
+            formattedResult = `${formattedResult.substring(2)}`;
+          } else if (formattedResult.startsWith('🔑')) {
+            formattedResult = formattedResult.substring(2);
+          } else if (formattedResult.startsWith('📝')) {
+            formattedResult = formattedResult.substring(2);
+          } else if (formattedResult.startsWith('📄')) {
+            formattedResult = formattedResult.substring(2);
+          } else if (formattedResult.startsWith('✓')) {
+            formattedResult = `• ${formattedResult.substring(2)}`;
+          } else if (formattedResult.startsWith('💡')) {
+            formattedResult = formattedResult.substring(2);
+          }
+          
+          response += `${index + 1}. ${formattedResult}\n`;
+        });
+        
+        // 添加更多信息
+        if (parsed.count > displayedResults.length) {
+          response += `\n... 还有 ${parsed.count - displayedResults.length} 条结果未显示`;
+        }
+        
+        if (parsed.source) {
+          response += `\n\n📚 信息来源: ${parsed.source}`;
+        }
+        
+        if (parsed.baike_url) {
+          response += `\n🔗 查看完整百科: ${parsed.baike_url}`;
+        }
+        
+        if (parsed.success === false && parsed.error) {
+          response += `\n\n⚠️ 注意: ${parsed.error}`;
+          if (parsed.suggestion) {
+            response += `\n💡 建议: ${parsed.suggestion}`;
+          }
+        }
+        
+        return response;
       }
-      return `搜索结果：${typeof parsed === 'string' ? parsed : JSON.stringify(parsed)}`;
 
     case 'textProcess':
       return `文本处理结果：${typeof parsed === 'string' ? parsed : JSON.stringify(parsed)}`;
@@ -656,7 +734,7 @@ async function handleAgentRequest(messages, res) {
         console.log('工具参数:', JSON.stringify(functionArgs, null, 2));
         
         // 执行工具
-        const toolResult = executeTool(functionName, functionArgs);
+        const toolResult = await executeTool(functionName, functionArgs);
         
         console.log('工具执行结果:', JSON.stringify(toolResult, null, 2));
         

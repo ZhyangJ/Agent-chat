@@ -41,21 +41,308 @@ function getCurrentTime(format = 'full') {
   }
 }
 
-// 搜索工具（模拟）
-function searchWeb(query) {
-  // 这是一个模拟的搜索工具
-  // 实际应用中可以调用真实的搜索 API
-  const mockResults = [
-    `关于"${query}"的搜索结果1：相关信息...`,
-    `关于"${query}"的搜索结果2：更多信息...`,
-    `关于"${query}"的搜索结果3：详细内容...`
-  ];
+const axios = require('axios');
+async function searchWeb(query, limit = 5) {
+  console.log(`🔍 使用百度百科搜索: "${query}"`);
   
-  return {
-    query: query,
-    results: mockResults,
-    count: mockResults.length
-  };
+  try {
+    // 1. 首先尝试百度百科API
+    const baiduResult = await searchWithBaiduBaike(query, limit);
+    if (baiduResult.success && baiduResult.results.length > 0) {
+      console.log(`✅ 百度百科搜索成功，找到 ${baiduResult.results.length} 条结果`);
+      return baiduResult;
+    }
+    
+    // 2. 如果百度百科没找到，尝试百度网页搜索
+    const baiduWebResult = await searchWithBaiduWeb(query, limit);
+    if (baiduWebResult.success) {
+      console.log(`✅ 百度网页搜索成功，找到 ${baiduWebResult.results.length} 条结果`);
+      return baiduWebResult;
+    }
+    
+    // 3. 都失败，返回知识库数据
+    console.log('⚠️ 在线搜索失败，返回本地知识库数据');
+    return getLocalKnowledgeData(query);
+    
+  } catch (error) {
+    console.error('❌ 百度搜索失败:', error.message);
+    return getLocalKnowledgeData(query, error.message);
+  }
+}
+
+// 百度百科搜索函数
+async function searchWithBaiduBaike(query, limit = 5) {
+  console.log(`📚 查询百度百科: "${query}"`);
+  
+  try {
+    const response = await axios.get(`https://baike.baidu.com/item/${encodeURIComponent(query)}`, {
+      timeout: 12000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Referer': 'https://baike.baidu.com/'
+      }
+    });
+    
+    const html = response.data;
+    console.log(`📄 收到HTML，长度: ${(html.length / 1024).toFixed(1)} KB`);
+    
+    const results = [];
+    
+    // === 1. 提取标题和基本信息 ===
+    const titleMatch = html.match(/<h1[^>]*>\s*(?:<span[^>]*>)?([^<]+?)(?:<\/span>)?\s*<\/h1>/);
+    let title = titleMatch ? titleMatch[1].trim() : query;
+    
+    // 尝试从title标签获取
+    if (!title || title.length < 2) {
+      const pageTitle = html.match(/<title>([^<]+)<\/title>/);
+      if (pageTitle) {
+        title = pageTitle[1].replace(/_百度百科$/, '').replace(/- 百度百科$/, '').trim();
+      }
+    }
+    
+    results.push(`📖 ${title}`);
+    
+    // === 2. 提取副标题/别名 ===
+    const subTitleMatch = html.match(/<h2[^>]*>\s*<span[^>]*>([^<]+)<\/span>\s*<\/h2>/);
+    if (subTitleMatch) {
+      const subTitle = subTitleMatch[1].trim();
+      if (subTitle !== title && !subTitle.includes('目录') && !subTitle.includes('参考资料')) {
+        results.push(`📌 别名: ${subTitle}`);
+      }
+    }
+    
+    // === 3. 提取摘要（lemma-summary）=== 
+    let summaryText = '';
+    const summaryMatch = html.match(/<div[^>]*class="lemma-summary"[^>]*>([\s\S]*?)<\/div>/);
+    
+    if (summaryMatch) {
+      summaryText = summaryMatch[1]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&#[0-9]+;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/\[\d+\]/g, '')  // 移除引用标记
+        .trim();
+      
+      if (summaryText.length > 30) {
+        // 分割成多个句子，每句单独一行
+        const sentences = summaryText.split(/[。！？；\.\!\?\;]/).filter(s => s.trim().length > 10);
+        sentences.slice(0, 3).forEach(sentence => {
+          const trimmed = sentence.trim();
+          if (trimmed && !results.some(r => r.includes(trimmed.substring(0, 20)))) {
+            results.push(`📝 ${trimmed}。`);
+          }
+        });
+      }
+    }
+    
+    // === 4. 提取基本信息卡片（关键-值对）===
+    const basicInfoRegex = /<dt[^>]*>(?:<span[^>]*>)?([^<]+?)(?:<\/span>)?<\/dt>\s*<dd[^>]*>(?:<span[^>]*>)?([\s\S]*?)(?:<\/span>)?<\/dd>/g;
+    let basicMatch;
+    let basicCount = 0;
+    
+    while ((basicMatch = basicInfoRegex.exec(html)) !== null && basicCount < 6) {
+      let key = basicMatch[1]
+        .replace(/<[^>]+>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      let value = basicMatch[2]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/\[\d+\]/g, '')
+        .trim();
+      
+      // 过滤掉太长的值和无效值
+      if (key && value && value.length < 150 && value.length > 3) {
+        // 避免重复的关键信息
+        const commonKeys = ['中文名', '外文名', '别名', '简称', '提出者', '提出时间', '应用学科', '适用领域'];
+        if (commonKeys.some(k => key.includes(k)) || key.length < 10) {
+          results.push(`🔑 **${key}**: ${value}`);
+          basicCount++;
+        }
+      }
+    }
+    
+    // === 5. 提取详细内容段落 ===
+    // 先找到主要内容的开始
+    const contentStart = html.indexOf('class="main-content"') || html.indexOf('class="content"') || 0;
+    const contentEnd = html.indexOf('<div class="side-content"', contentStart) || 
+                      html.indexOf('<div class="lemmaWgt-sideBar"', contentStart) || 
+                      html.length;
+    
+    if (contentEnd - contentStart > 1000) {
+      const contentSection = html.substring(contentStart, contentEnd);
+      
+      // 提取所有段落
+      const paraRegex = /<div[^>]*class="para"[^>]*>([\s\S]*?)<\/div>/g;
+      let paraMatch;
+      let paraCount = 0;
+      let extractedTexts = new Set(); // 用于去重
+      
+      while ((paraMatch = paraRegex.exec(contentSection)) !== null && paraCount < 8) {
+        let para = paraMatch[1]
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&#[0-9]+;/g, ' ')
+          .replace(/\s+/g, ' ')
+          .replace(/\[\d+\]/g, '')
+          .trim();
+        
+        // 清理和格式化
+        if (para.length > 60 && para.length < 500) {
+          // 检查是否和已有的内容重复
+          const paraStart = para.substring(0, 50);
+          if (!extractedTexts.has(paraStart) && !hasTooManySpecialChars(para)) {
+            // 分段处理：如果段落太长，分割成句子
+            if (para.length > 150) {
+              const sentences = para.split(/[。！？；\.\!\?\;]/).filter(s => s.trim().length > 30);
+              sentences.slice(0, 2).forEach(sentence => {
+                const trimmed = sentence.trim();
+                if (trimmed && !results.some(r => r.includes(trimmed.substring(0, 30)))) {
+                  results.push(`📄 ${trimmed}。`);
+                  paraCount++;
+                }
+              });
+            } else {
+              results.push(`📄 ${para}`);
+              paraCount++;
+            }
+            extractedTexts.add(paraStart);
+          }
+        }
+      }
+    }
+    
+    // === 6. 提取目录结构（了解内容组织）===
+    const catalogMatch = html.match(/<div[^>]*class="catalog"[^>]*>([\s\S]*?)<\/div>/);
+    if (catalogMatch) {
+      const catalogText = catalogMatch[1]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // 提取主要章节
+      const sections = catalogText.match(/\d+(?:\.\d+)*\s+[^0-9\s].{2,30}/g);
+      if (sections && sections.length > 0) {
+        results.push(`📚 **主要内容章节**:`);
+        sections.slice(0, 5).forEach((section, i) => {
+          if (i < 3) { // 只显示前3个主要章节
+            results.push(`   ${section}`);
+          }
+        });
+      }
+    }
+    
+    // === 7. 提取关键特点/特性 ===
+    // 查找列表项
+    const listItemRegex = /<li[^>]*>([\s\S]*?)<\/li>/g;
+    let listMatch;
+    let listCount = 0;
+    
+    while ((listMatch = listItemRegex.exec(html)) !== null && listCount < 5) {
+      let item = listMatch[1]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      if (item.length > 20 && item.length < 200 && 
+          !item.includes('function') && !item.includes('baidu') &&
+          !results.some(r => r.includes(item.substring(0, 30)))) {
+        results.push(`✓ ${item}`);
+        listCount++;
+      }
+    }
+    
+    // === 8. 如果没有提取到足够内容，使用备用解析方法 ===
+    if (results.length < 6) {
+      console.log('⚠️ 内容较少，使用备用解析方法...');
+      
+      // 备用方法：直接提取所有文本，然后筛选关键句子
+      const allText = html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&#[0-9]+;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/\[\d+\]/g, '');
+      
+      // 寻找包含关键词的句子
+      const sentences = allText.split(/[。！？；\.\!\?\;]/);
+      const keyword = query.length > 2 ? query.substring(0, 3) : query;
+      let keywordSentences = [];
+      
+      for (const sentence of sentences) {
+        const trimmed = sentence.trim();
+        if (trimmed.length > 40 && trimmed.length < 300) {
+          if (trimmed.includes(keyword) || 
+              trimmed.includes('是') || 
+              trimmed.includes('包括') || 
+              trimmed.includes('分为') ||
+              trimmed.includes('主要')) {
+            if (!keywordSentences.some(s => s.includes(trimmed.substring(0, 30)))) {
+              keywordSentences.push(trimmed);
+            }
+          }
+        }
+      }
+      
+      // 添加关键句子
+      keywordSentences.slice(0, 4).forEach(sentence => {
+        if (!results.some(r => r.includes(sentence.substring(0, 30)))) {
+          results.push(`💡 ${sentence}。`);
+        }
+      });
+    }
+    
+    // === 9. 补充本地知识（如果在线内容不足）===
+    if (results.length < 5) {
+      const localKnowledge = getEnhancedLocalKnowledge(query);
+      if (localKnowledge.length > 0) {
+        results.push(`📚 **补充知识**:`);
+        localKnowledge.slice(0, 3).forEach(item => {
+          results.push(`   ${item}`);
+        });
+      }
+    }
+    
+    // === 10. 添加结构化总结 ===
+    if (results.length > 3) {
+      results.push(`\n📊 **信息总结**:`);
+      results.push(`   • 共提取 ${results.length - 1} 条关键信息`);
+      results.push(`   • 包含定义、特点、应用等内容`);
+    }
+    
+    // === 11. 添加访问链接 ===
+    const encodedQuery = encodeURIComponent(query);
+    results.push(`\n🔗 **完整内容**: https://baike.baidu.com/item/${encodedQuery}`);
+    results.push(`📱 **移动端**: https://m.baike.baidu.com/item/${encodedQuery}`);
+    
+    console.log(`✅ 百度百科解析完成，提取 ${results.length} 条信息`);
+    
+    return {
+      query: query,
+      results: results.slice(0, limit + 8), // 多留一些空间
+      count: results.length,
+      success: true,
+      source: '百度百科（增强解析）',
+      baike_url: `https://baike.baidu.com/item/${encodedQuery}`,
+      info_count: results.length
+    };
+    
+  } catch (error) {
+    console.error('百度百科查询失败:', error.message);
+    throw error;
+  }
 }
 
 // 文本处理工具
@@ -278,7 +565,7 @@ const toolDefinitions = [
 ];
 
 // 工具执行器
-function executeTool(toolName, arguments_) {
+async function executeTool(toolName, arguments_) {
   console.log(`\n=== 执行工具: ${toolName} ===`);
   console.log('参数:', arguments_);
   
@@ -293,7 +580,7 @@ function executeTool(toolName, arguments_) {
         result = getCurrentTime(arguments_.format);
         break;
       case 'searchWeb':
-        result = searchWeb(arguments_.query);
+        result = await searchWeb(arguments_.query);
         break;
       case 'textProcess':
         result = textProcess(arguments_.text, arguments_.operation);
