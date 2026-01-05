@@ -1,6 +1,7 @@
 
 # Agent-chat
-数传大四实践课程内容，实现Agent
+数传大四实践课程内容，实现Agent 
+
 基于 Vue 3 + Node.js 构建的AI聊天应用项目，实现了与讯飞MaaS平台的集成，支持流式对话功能。
 
 ## 技术栈
@@ -286,6 +287,10 @@ pm start
 - 检查Element Plus是否正确安装
 - 清除浏览器缓存
 - 查看控制台是否有CSS错误
+
+### 4. 项目启动后提示：无效的令牌
+- <img width="1632" height="286" alt="image" src="https://github.com/user-attachments/assets/8cfad6f1-0503-4ddb-a0a0-061a1712369f" />
+- 检查项目路径是否含有中文
 
 ## 扩展学习
 
